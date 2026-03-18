@@ -1,0 +1,4 @@
+node_modules/
+uploads/audio/*.m4a
+uploads/audio/*.mp3
+uploads/audio/*.wav
