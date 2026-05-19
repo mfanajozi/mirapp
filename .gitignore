@@ -14,7 +14,6 @@ server/uploads/
 .env.*.local
 
 # Misc
-.npmrc
 *.log
 .DS_Store
 Thumbs.db
