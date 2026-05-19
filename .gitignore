@@ -1,5 +1,20 @@
+# Expo / Metro
 node_modules/
 .expo/
 dist/
 expo-env.d.ts
+
+# Server
+server/node_modules/
+server/uploads/
+
+# Environment — never commit secrets
 .env
+.env.local
+.env.*.local
+
+# Misc
+.npmrc
+*.log
+.DS_Store
+Thumbs.db

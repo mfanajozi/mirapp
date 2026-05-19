@@ -21,6 +21,7 @@ import { Feather, MaterialIcons } from '@expo/vector-icons';
 import ChatModal from '../components/ChatModal';
 import StatusOverlay from '../components/StatusOverlay';
 import { API_BASE_URL } from '../constants/api';
+import { useLocation } from '../hooks/useLocation';
 
 const CALL_NUMBER = '+278600010111';
 
@@ -36,6 +37,7 @@ export default function HomeScreen() {
   const [statusVisible, setStatusVisible] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const { getLocation } = useLocation();
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -119,11 +121,26 @@ export default function HomeScreen() {
     setTimeout(() => setStatusVisible(false), duration);
   };
 
-  // Pull-to-refresh: reset form and replay entry animation
+  // Pull-to-refresh: stop any active recording and reset everything to ready state
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
+
+    // Stop recording if active (fire-and-forget — state is reset immediately below)
+    if (recordingRef.current) {
+      recordingRef.current.stopAndUnloadAsync().catch(() => {});
+      recordingRef.current = null;
+    }
+
+    setIsRecording(false);
+    setIsSendingText(false);
+    setIsSendingAudio(false);
     setTextMessage('');
     setStatusVisible(false);
+
+    // Reset ripple/pulse to idle position
+    rippleAnim.setValue(1);
+    rippleOpacity.setValue(0);
+
     runEntryAnimation();
     startIdlePulse();
     setTimeout(() => setRefreshing(false), 600);
@@ -188,11 +205,22 @@ export default function HomeScreen() {
       const parsed = JSON.parse(uploadResult.body);
       if (!parsed.url) throw new Error(`No URL in response: ${uploadResult.body}`);
 
-      // Step 2: save to DB
+      // Step 2: capture location (silently — not shown in UI)
+      const locationData = await getLocation();
+
+      // Step 3: save to DB
       const reportRes = await fetch(`${API_BASE_URL}/api/report`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'audio', content: parsed.url, is_anonymous: true }),
+        body: JSON.stringify({
+          type: 'audio',
+          audio_url: parsed.url,
+          object_key: parsed.object_key,
+          content: parsed.url,
+          location: locationData?.location ?? null,
+          geo_location: locationData?.geoLocation ?? null,
+          is_anonymous: true,
+        }),
       });
       if (!reportRes.ok) {
         const body = await reportRes.text();
@@ -214,20 +242,35 @@ export default function HomeScreen() {
     showStatus('Sending report…', 'info');
 
     try {
+      // Capture location silently before sending — not shown in UI
+      const locationData = await getLocation();
+
       let res: Response;
       try {
         res = await fetch(`${API_BASE_URL}/api/report`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'text', content: msg, is_anonymous: true }),
+          body: JSON.stringify({
+            type: 'text',
+            content: msg,
+            location: locationData?.location ?? null,
+            geo_location: locationData?.geoLocation ?? null,
+            is_anonymous: true,
+          }),
         });
       } catch (netErr: any) {
         throw new Error(`Cannot reach server — is it running? (${netErr?.message ?? netErr})`);
       }
 
       if (!res.ok) {
-        const body = await res.text();
-        throw new Error(`Server error ${res.status}: ${body}`);
+        let msg = `Server error ${res.status}`;
+        try {
+          const json = await res.json();
+          msg = json.detail || json.error || msg;
+        } catch {
+          msg = (await res.text().catch(() => '')) || msg;
+        }
+        throw new Error(msg);
       }
 
       setTextMessage('');
@@ -287,12 +330,13 @@ export default function HomeScreen() {
             <Pressable
               onPressIn={handleRecordStart}
               onPressOut={handleRecordStop}
-              disabled={isSendingAudio}
+              disabled={isSendingAudio || !!textMessage.trim() || isSendingText}
             >
               <Animated.View
                 style={[
                   styles.recordBtn,
                   isRecording && styles.recordBtnActive,
+                  (!!textMessage.trim() || isSendingText) && styles.recordBtnLocked,
                   { transform: [{ scale: pulseAnim }] },
                 ]}
               >
@@ -310,20 +354,23 @@ export default function HomeScreen() {
               ? 'Recording… release to send'
               : isSendingAudio
               ? 'Uploading…'
+              : textMessage.trim()
+              ? 'Clear the text field to use voice'
               : 'Tap & hold to record, release to send'}
           </Text>
 
           {/* Text Input */}
           <Animated.View style={[styles.inputRow, { opacity: inputFade }]}>
             <TextInput
-              style={styles.textInput}
-              placeholder="Type the message here..."
+              style={[styles.textInput, (isRecording || isSendingAudio) && styles.textInputLocked]}
+              placeholder={isRecording ? 'Voice recording in progress…' : 'Type the message here...'}
               placeholderTextColor="#aaa"
               value={textMessage}
               onChangeText={setTextMessage}
               multiline={false}
               returnKeyType="send"
               onSubmitEditing={handleSendText}
+              editable={!isRecording && !isSendingAudio}
             />
             <TouchableOpacity
               style={[styles.sendBtn, (!textMessage.trim() || isSendingText) && styles.sendBtnDisabled]}
@@ -429,6 +476,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#C53030',
     shadowOpacity: 0.6,
   },
+  recordBtnLocked: {
+    opacity: 0.35,
+  },
   recordHint: {
     fontSize: 15,
     color: '#555',
@@ -458,6 +508,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333',
     paddingVertical: 14,
+  },
+  textInputLocked: {
+    opacity: 0.4,
   },
   sendBtn: {
     padding: 8,

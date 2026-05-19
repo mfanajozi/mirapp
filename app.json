@@ -16,7 +16,8 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.interventionnetwork.mirapp",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "MIRApp needs microphone access to record anonymous audio reports."
+        "NSMicrophoneUsageDescription": "MIRApp needs microphone access to record anonymous audio reports.",
+        "NSLocationWhenInUseUsageDescription": "MIRApp captures your location once when you submit a report to help responders reach the right area."
       }
     },
     "android": {
@@ -27,7 +28,10 @@
       "package": "com.interventionnetwork.mirapp",
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -41,10 +45,22 @@
         {
           "microphonePermission": "MIRApp needs microphone access to record anonymous audio reports."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MIRApp captures your location once when you submit a report to help responders reach the right area."
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "9ad5f25e-5608-434b-93d2-305ffcc08aba"
+      }
     }
   }
 }
