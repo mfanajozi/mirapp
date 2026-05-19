@@ -53,6 +53,14 @@
         }
       ]
     ],
+    "updates": {
+      "url": "https://u.expo.dev/9ad5f25e-5608-434b-93d2-305ffcc08aba",
+      "enabled": true,
+      "fallbackToCacheTimeout": 0
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "experiments": {
       "typedRoutes": true
     },
